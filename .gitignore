@@ -1,0 +1,14 @@
+# Data files - never push to GitHub
+data/
+*.csv
+*.zip
+*.gz
+
+# Jupyter
+.ipynb_checkpoints/
+__pycache__/
+
+# Environment
+.env
+venv/
+*.pyc

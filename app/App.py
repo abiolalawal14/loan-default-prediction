@@ -177,13 +177,18 @@ st.markdown("""
 # ─────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    # Get the directory where app.py lives
     base_dir = os.path.dirname(os.path.abspath(__file__))
     models_dir = os.path.join(base_dir, '..', 'models')
 
-    model = joblib.load(os.path.join(models_dir, 'xgb_model.pkl'))
+    # Load gender-free model
+    # Gender removed following Dalex analysis which identified
+    # CODE_GENDER_M as 4th most important feature — using gender
+    # in credit scoring creates CBN regulatory exposure
+    model = joblib.load(
+        os.path.join(models_dir, 'xgb_model_no_gender.pkl')
+    )
     feature_names = joblib.load(
-        os.path.join(models_dir, 'feature_names.pkl')
+        os.path.join(models_dir, 'feature_names_no_gender.pkl')
     )
     return model, feature_names
 
@@ -279,6 +284,8 @@ with st.sidebar:
     - **Recall:** 65.8% of defaults caught
     - **Algorithm:** XGBoost
     - **Training records:** 307,511
+    - **Gender-neutral:** Yes ✅
+    - **CBN compliant:** Fair lending ready
     """)
     st.markdown("---")
     st.markdown("""
@@ -300,6 +307,12 @@ st.markdown("# 🏦 Loan Default Risk Predictor")
 st.markdown(
     "Enter borrower information below to get an instant "
     "credit risk assessment powered by machine learning."
+)
+st.info(
+    "🔒 **Fair Lending Model** — This tool does not use gender, "
+    "ethnicity, religion, or any protected characteristic in its "
+    "credit assessment. Risk scoring is based solely on financial "
+    "behaviour and creditworthiness indicators."
 )
 st.markdown("---")
 
@@ -324,11 +337,6 @@ with col1:
     age = st.slider(
         "Age (years)", 18, 70, 35,
         help="Borrower's current age"
-    )
-    gender = st.selectbox("Gender", ["Male", "Female"])
-    family_status = st.selectbox(
-        "Family Status",
-        ["Single", "Married", "Divorced", "Widow"]
     )
     children = st.number_input(
         "Number of Children", 0, 10, 0
@@ -454,7 +462,7 @@ def compute_engineered_features(
         employment_years, ext_source_1,
         ext_source_2, ext_source_3,
         family_members, goods_price,
-        children, gender, own_car,
+        children, own_car,
         own_realty, flag_document_3,
         contract_type, education,
         family_status):
@@ -487,7 +495,6 @@ def compute_engineered_features(
         'DAYS_EMPLOYED': -employment_years * 365,
         'CNT_CHILDREN': children,
         'CNT_FAM_MEMBERS': family_members,
-        'CODE_GENDER_M': 1 if gender == "Male" else 0,
         'FLAG_OWN_CAR': 1 if own_car else 0,
         'FLAG_OWN_REALTY': 1 if own_realty else 0,
         'FLAG_DOCUMENT_3': 1 if flag_document_3 else 0,
@@ -514,7 +521,7 @@ if predict_button:
         employment_years, ext_source_1,
         ext_source_2, ext_source_3,
         family_members, goods_price,
-        children, gender, own_car,
+        children, own_car,
         own_realty, flag_document_3,
         contract_type, education,
         family_status

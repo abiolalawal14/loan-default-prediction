@@ -338,6 +338,10 @@ with col1:
         "Age (years)", 18, 70, 35,
         help="Borrower's current age"
     )
+    family_status = st.selectbox(
+        "Family Status",
+        ["Single", "Married", "Divorced", "Widow"]
+    )
     children = st.number_input(
         "Number of Children", 0, 10, 0
     )

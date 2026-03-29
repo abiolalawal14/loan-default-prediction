@@ -21,9 +21,12 @@ This model was built with institutional deployment in mind.
 |-----------|---------------|
 | **Gender-neutral** | Gender removed after Dalex analysis — only 0.0015 AUC impact |
 | **Explainable** | Every prediction explained via SHAP — no black box decisions |
-| **Transparent** | Full methodology documented across 6 notebooks |
+| **Transparent** | Full methodology documented across 7 notebooks |
 | **Auditable** | All code open source on GitHub |
 | **CBN-ready** | Fair lending principles applied throughout |
+| **Decision support** | Explicit disclaimer — model aids judgement, does not replace it |
+| **Adjustable thresholds** | MFBs can configure risk bands to match their credit policy |
+| **Full market range** | No income or loan size caps — covers micro to commercial lending |
 
 > A model retrained on institution-specific data with local FC/CRC bureau
 > scores would be required for live deployment at a CBN-regulated MFB or fintech.
@@ -40,7 +43,8 @@ A loan officer reviewing 40 applications a day using a 2019 spreadsheet
 cannot simultaneously weigh bureau scores, debt burden, employment stability,
 and household income for every applicant.
 
-This system does.
+This system does — covering the full range of the Nigerian lending market,
+from microfinance to commercial facilities, with no upper income or loan limits.
 
 ---
 
@@ -56,6 +60,8 @@ This system does.
 | **Best model** | XGBoost (gender-neutral) |
 | **AUC-ROC** | 0.7664 |
 | **Recall** | 65.3% of defaults caught |
+| **Income range** | No upper limit — full Nigerian market |
+| **Risk thresholds** | Adjustable per institution credit policy |
 
 ---
 
@@ -101,6 +107,13 @@ Dalex partial dependence revealed a hump-shaped age profile — default risk
 peaks around age 40-42 then declines toward retirement. This pattern is
 invisible to Logistic Regression but captured by XGBoost.
 
+**7. SMOTE does not improve underlying discriminatory ability**
+SMOTE experimentation confirmed that threshold optimisation — not synthetic
+oversampling — is the correct lever for recall improvement on this dataset.
+At the Youden optimal threshold, recall improves to 73.1% without synthetic
+data generation. The baseline model's Precision-Recall curve and SMOTE's
+are nearly identical (AP: 0.256 vs 0.246).
+
 ---
 
 ## 🛠 Technical Stack
@@ -111,7 +124,8 @@ invisible to Logistic Regression but captured by XGBoost.
 | ML modelling | scikit-learn, XGBoost |
 | Explainability | SHAP, Dalex |
 | Anomaly detection | Isolation Forest, One-Class SVM |
-| Visualisation | matplotlib, seaborn |
+| Imbalance handling | SMOTE, threshold optimisation |
+| Visualisation | matplotlib, seaborn, Plotly |
 | Deployment | Streamlit, Streamlit Cloud |
 | Version control | Git, GitHub |
 
@@ -136,7 +150,8 @@ loan-default-prediction/
 │   ├── 03_baseline_model.ipynb        ← logistic regression baseline
 │   ├── 04_xgboost_shap.ipynb          ← XGBoost + SHAP + gender-free retrain
 │   ├── 05_anomaly_detection.ipynb     ← Isolation Forest + One-Class SVM
-│   └── 06_dalex_explainability.ipynb  ← portfolio-level explanation
+│   ├── 06_dalex_explainability.ipynb  ← portfolio-level explanation
+│   └── 07_smote_experiment.ipynb      ← SMOTE vs threshold optimisation
 ├── reports/
 │   ├── missing_values.png
 │   ├── target_distribution.png
@@ -151,7 +166,9 @@ loan-default-prediction/
 │   ├── dalex_partial_dependence.png
 │   ├── dalex_residuals.png
 │   ├── dalex_breakdown.png
-│   └── model_comparison_full.png
+│   ├── model_comparison_full.png
+│   ├── smote_comparison.png
+│   └── smote_threshold_analysis.png
 ├── .streamlit/
 │   └── config.toml
 ├── requirements.txt
@@ -175,10 +192,11 @@ loan-default-prediction/
 
 | Approach | Model | AUC-ROC | Recall | Verdict |
 |----------|-------|---------|--------|---------|
-| Supervised | XGBoost | 0.7664 | 65.3% | ✅ Champion |
+| Supervised | XGBoost (gender-free) | 0.7664 | 65.3% | ✅ Deployed |
 | Supervised | Logistic Regression | 0.7484 | — | Baseline |
 | Unsupervised | Isolation Forest | 0.5213 | 9.2% | ❌ Insufficient |
 | Unsupervised | One-Class SVM | 0.4535 | 5.4% | ❌ Insufficient |
+| SMOTE + Youden threshold | XGBoost | 0.7637 | 73.1% | ⚡ Threshold-dependent |
 
 > Anomaly detection approaches failed to reliably detect defaults —
 > confirming that loan default is a supervised classification problem,
@@ -195,6 +213,9 @@ loan-default-prediction/
 
 ### Dalex Partial Dependence Profiles
 ![Dalex Partial Dependence](reports/dalex_partial_dependence.png)
+
+### SMOTE Threshold Analysis
+![SMOTE Analysis](reports/smote_threshold_analysis.png)
 
 ---
 
@@ -233,6 +254,19 @@ complementing the individual-prediction SHAP analysis.
 
 ---
 
+## 🏦 App Features
+
+The live Streamlit application includes:
+
+- **Full Nigerian market range** — no income or loan size caps
+- **Adjustable risk thresholds** — institutions set their own Medium and High Risk bands
+- **SHAP explanation chart** — every prediction explained in plain English
+- **Decision support disclaimer** — explicit reminder that model aids, not replaces, judgement
+- **Credit file summary** — ready-to-document assessment output for loan files
+- **Fair lending declaration** — gender-neutral, CBN compliant messaging throughout
+
+---
+
 ## 🚀 Run Locally
 
 ```bash
@@ -261,9 +295,12 @@ streamlit run app.py
 - [x] Anomaly detection — Isolation Forest + One-Class SVM
 - [x] Dalex explainability — portfolio-level analysis
 - [x] Gender-neutral model — fair lending compliance (AUC: 0.7664)
-- [ ] SMOTE experimentation
+- [x] SMOTE experimentation — threshold analysis (recall: 73.1% at Youden threshold)
+- [x] Full Nigerian market range — income and loan caps removed
+- [x] Adjustable risk thresholds — institution-configurable
+- [x] Decision support disclaimer — human judgement reinforcement
+- [ ] NIBSS BVN integration — auto-populate FC/CRC bureau scores
 - [ ] Hyperparameter tuning
-- [ ] Nigerian bureau score integration (FC/CRC)
 - [ ] FastAPI REST endpoint
 - [ ] Project 2 — Fraud Detection Engine
 
@@ -277,8 +314,12 @@ This tool is currently a demonstration system trained on international data.
 
 1. **Data Assessment** — review 3-5 years of historical loan data with repayment outcomes
 2. **Model Retraining** — retrain on institution-specific data using actual FC/CRC bureau scores
-3. **Portfolio Validation** — validate against existing NPL portfolio and calibrate risk thresholds
+3. **Portfolio Validation** — validate against existing NPL portfolio and calibrate risk thresholds to your credit policy
 4. **Compliance Review** — CBN fair lending guidelines review before live deployment
+
+**The app's adjustable threshold feature allows institutions to plug in their
+own risk bands immediately — without retraining — as a starting point for
+evaluation.**
 
 **Interested in a custom deployment for your institution?**
 Contact: abiolalawal14@gmail.com

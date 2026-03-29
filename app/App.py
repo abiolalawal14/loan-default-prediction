@@ -160,6 +160,16 @@ st.markdown("""
         margin-top: 10px;
         line-height: 1.7;
     }
+    .disclaimer-box {
+        background: #FFF8E7;
+        border-left: 4px solid #F0A500;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: #7A5C00;
+        margin-top: 10px;
+        line-height: 1.7;
+    }
     .footer {
         text-align: center;
         color: #888;
@@ -179,11 +189,6 @@ st.markdown("""
 def load_model():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     models_dir = os.path.join(base_dir, '..', 'models')
-
-    # Load gender-free model
-    # Gender removed following Dalex analysis which identified
-    # CODE_GENDER_M as 4th most important feature — using gender
-    # in credit scoring creates CBN regulatory exposure
     model = joblib.load(
         os.path.join(models_dir, 'xgb_model_no_gender.pkl')
     )
@@ -219,7 +224,6 @@ FEATURE_LABELS = {
     'INCOME_PER_PERSON':            'Income Per Family Member (₦)',
     'CNT_CHILDREN':                 'Number of Dependants',
     'CNT_FAM_MEMBERS':              'Total Family Size',
-    'CODE_GENDER_M':                'Gender (Male)',
     'FLAG_OWN_CAR':                 'Owns a Vehicle',
     'FLAG_OWN_REALTY':              'Owns Property / Real Estate',
     'FLAG_DOCUMENT_3':              'ID Document 3 Submitted',
@@ -235,10 +239,12 @@ FEATURE_LABELS = {
 # ─────────────────────────────────────────
 # HELPER FUNCTIONS
 # ─────────────────────────────────────────
-def get_risk_label(probability):
-    if probability >= 0.6:
+def get_risk_label(probability,
+                   medium_threshold=0.3,
+                   high_threshold=0.6):
+    if probability >= high_threshold:
         return "HIGH RISK", "#E24B4A", "risk-high", "🔴"
-    elif probability >= 0.3:
+    elif probability >= medium_threshold:
         return "MEDIUM RISK", "#F0A500", "risk-medium", "🟡"
     else:
         return "LOW RISK", "#1D9E75", "risk-low", "🟢"
@@ -274,19 +280,74 @@ with st.sidebar:
     st.markdown("### How it works")
     st.markdown("""
     1. Enter borrower details on the right
-    2. Click **Predict Default Risk**
-    3. View the risk score and explanation
+    2. Adjust risk thresholds to match your policy
+    3. Click **Predict Default Risk**
+    4. View the risk score and explanation
     """)
     st.markdown("---")
     st.markdown("### Model Performance")
     st.markdown("""
-    - **AUC-ROC:** 0.7679
-    - **Recall:** 65.8% of defaults caught
+    - **AUC-ROC:** 0.7664
+    - **Recall:** 65.3% of defaults caught
     - **Algorithm:** XGBoost
     - **Training records:** 307,511
     - **Gender-neutral:** Yes ✅
     - **CBN compliant:** Fair lending ready
+    - **Income range:** No upper limit
+    - **Market scope:** Micro to commercial
     """)
+    st.markdown("---")
+
+    # ── ADJUSTABLE RISK THRESHOLDS ───────────
+    st.markdown("### ⚙️ Risk Threshold Settings")
+    st.markdown("""
+    <div style='font-size:12px;color:#B5D4F4;margin-bottom:8px'>
+    Adjust thresholds to match your institution's
+    credit policy and risk appetite.
+    </div>
+    """, unsafe_allow_html=True)
+
+    medium_threshold = st.slider(
+        "Medium Risk Threshold (%)",
+        min_value=10,
+        max_value=50,
+        value=30,
+        step=5,
+        help="Applications scoring above this are Medium Risk"
+    ) / 100
+
+    high_threshold = st.slider(
+        "High Risk Threshold (%)",
+        min_value=30,
+        max_value=80,
+        value=60,
+        step=5,
+        help="Applications scoring above this are High Risk"
+    ) / 100
+
+    if high_threshold <= medium_threshold:
+        high_threshold = medium_threshold + 0.10
+
+    st.markdown(f"""
+    <div style='background:#0C447C;border-radius:6px;
+                padding:10px;font-size:12px;margin-top:8px'>
+        <div style='color:#B5D4F4;margin-bottom:6px;
+                    font-weight:600'>
+            Current institution policy:
+        </div>
+        <div style='color:#FFFFFF;margin-bottom:2px'>
+            🟢 Below {int(medium_threshold*100)}% → Approve
+        </div>
+        <div style='color:#FFFFFF;margin-bottom:2px'>
+            🟡 {int(medium_threshold*100)}–{int(high_threshold*100)}%
+            → Conditional Review
+        </div>
+        <div style='color:#FFFFFF'>
+            🔴 Above {int(high_threshold*100)}% → Decline
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown("---")
     st.markdown("""
     <div style='font-size:12px'>
@@ -306,13 +367,28 @@ with st.sidebar:
 st.markdown("# 🏦 Loan Default Risk Predictor")
 st.markdown(
     "Enter borrower information below to get an instant "
-    "credit risk assessment powered by machine learning."
+    "credit risk assessment powered by machine learning. "
+    "Covers the full range of the Nigerian lending market — "
+    "from microfinance to commercial facilities."
 )
+
+st.warning(
+    "⚖️ **Decision Support Tool — Not a Substitute for "
+    "Credit Judgement** — "
+    "This tool provides a data-driven risk signal to aid "
+    "informed decision-making. "
+    "Final approval must incorporate loan officer assessment "
+    "of borrower context, market conditions, guarantor quality, "
+    "and institutional credit policy. "
+    "This score should inform the decision — not replace it."
+)
+
 st.info(
-    "🔒 **Fair Lending Model** — This tool does not use gender, "
-    "ethnicity, religion, or any protected characteristic in its "
-    "credit assessment. Risk scoring is based solely on financial "
-    "behaviour and creditworthiness indicators."
+    "🔒 **Fair Lending Model** — Gender-neutral and CBN fair "
+    "lending compliant. Risk scoring is based solely on "
+    "financial behaviour and creditworthiness indicators. "
+    "| 📍 Built for Nigeria · Powered by XGBoost · "
+    "Explained by SHAP"
 )
 st.markdown("---")
 
@@ -369,38 +445,43 @@ with col2:
     income = st.number_input(
         "Annual Income (₦)",
         min_value=10000,
-        max_value=10000000,
-        value=150000,
-        step=10000,
+        max_value=500000000,
+        value=1800000,
+        step=50000,
         format="%d",
-        help="Total annual income in Naira"
+        help="Total annual income in Naira — salary, "
+             "business income, and all other income sources. "
+             "No upper limit applied."
     )
     loan_amount = st.number_input(
         "Loan Amount Requested (₦)",
         min_value=10000,
-        max_value=10000000,
-        value=500000,
-        step=10000,
+        max_value=500000000,
+        value=5000000,
+        step=100000,
         format="%d",
-        help="Total loan amount being requested"
+        help="Total loan amount requested — "
+             "from micro loans to commercial facilities"
     )
     annuity = st.number_input(
         "Monthly Repayment Amount (₦)",
         min_value=1000,
-        max_value=500000,
-        value=25000,
-        step=1000,
+        max_value=50000000,
+        value=150000,
+        step=10000,
         format="%d",
         help="Expected monthly repayment instalment"
     )
     goods_price = st.number_input(
         "Asset / Goods Value (₦)",
         min_value=0,
-        max_value=10000000,
-        value=450000,
-        step=10000,
+        max_value=500000000,
+        value=4500000,
+        step=100000,
         format="%d",
-        help="Value of goods or property being financed"
+        help="Value of asset, goods, or property being "
+             "financed — vehicles, equipment, real estate, "
+             "or inventory"
     )
     contract_type = st.selectbox(
         "Loan Type",
@@ -534,7 +615,8 @@ if predict_button:
 
     probability = model.predict_proba(input_df)[0][1]
     risk_label, risk_color, risk_class, risk_icon = \
-        get_risk_label(probability)
+        get_risk_label(probability, medium_threshold,
+                       high_threshold)
 
     credit_income = loan_amount / max(income, 1)
     ext_avg = np.mean([ext_source_1, ext_source_2, ext_source_3])
@@ -552,6 +634,10 @@ if predict_button:
             <div style="font-size:20px;font-weight:700;
                         color:{risk_color};margin-top:6px">
                 {risk_label}
+            </div>
+            <div style="font-size:11px;color:#888;margin-top:4px">
+                Policy: {int(medium_threshold*100)}% /
+                {int(high_threshold*100)}%
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -608,31 +694,49 @@ if predict_button:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── INSIGHT BOX ─────────────────────────
-    if probability >= 0.6:
+    if probability >= high_threshold:
         insight = (
             "⚠️ This application carries significant default risk. "
-            "The combination of credit bureau scores and debt burden "
-            "suggests this borrower may struggle with repayment. "
-            "Manual review strongly recommended before approval."
+            "The credit bureau profile and debt-to-income ratio "
+            "suggest this borrower may struggle to meet repayment "
+            "obligations. Recommend decline or referral to credit "
+            "committee with additional collateral or guarantor "
+            "requirements before consideration."
         )
-    elif probability >= 0.3:
+    elif probability >= medium_threshold:
         insight = (
             "⚡ This application shows moderate risk indicators. "
-            "Consider requesting additional documentation, a guarantor, "
-            "or reducing the loan amount to bring the "
-            "loan-to-income ratio within acceptable bounds."
+            "Consider requesting additional documentation — "
+            "6 months bank statement, business registration, "
+            "or a credible guarantor. Loan restructuring to reduce "
+            "monthly repayment burden may bring this within "
+            "acceptable risk bounds."
         )
     else:
         insight = (
             "✅ This application presents a low default risk profile. "
-            "Strong credit bureau scores and a manageable "
-            "loan-to-income ratio suggest this borrower is likely "
-            "to meet repayment obligations. "
-            "Standard approval process recommended."
+            "Credit bureau history and debt-to-income ratio are "
+            "within acceptable bounds. Recommend standard approval "
+            "process with routine documentation verification — "
+            "bank statement, means of identification, and "
+            "proof of income."
         )
 
     st.markdown(
         f'<div class="insight-box">{insight}</div>',
+        unsafe_allow_html=True
+    )
+
+    # ── DECISION SUPPORT REMINDER ────────────
+    st.markdown(
+        '<div class="disclaimer-box">'
+        '⚖️ <strong>Reminder:</strong> This score is one input '
+        'into the credit decision. Loan officer assessment of '
+        'borrower context, market conditions, guarantor quality, '
+        'and business viability must inform the final decision. '
+        'This tool aids informed decision-making — '
+        'it does not replace credit judgement.'
+        '</div>',
         unsafe_allow_html=True
     )
 
@@ -663,7 +767,6 @@ if predict_button:
                 shap_vals[0], index=feature_names
             )[top_features]
 
-            # Apply Nigerian-friendly labels
             top_labels = [
                 get_label(f) for f in top_features
             ]
@@ -729,7 +832,8 @@ if predict_button:
             <div style="font-size:12px;color:#888;margin-bottom:4px">
                 Credit Bureau History
             </div>
-            <div style="font-size:24px;font-weight:700;color:#1F3864">
+            <div style="font-size:24px;font-weight:700;
+                        color:#1F3864">
                 {ext_avg:.2f} / 1.00
             </div>
             <div style="font-size:13px;color:#444;margin-top:6px">
@@ -773,9 +877,11 @@ if predict_button:
             "#1D9E75"
         )
         employ_status = (
-            "🔴 Unstable — No Employment" if employment_years < 1 else
-            "🟡 Early Stage — Less than 3yrs" if employment_years < 3
-            else "🟢 Stable — 3+ Years"
+            "🔴 Unstable — No Employment"
+            if employment_years < 1 else
+            "🟡 Early Stage — Less than 3yrs"
+            if employment_years < 3 else
+            "🟢 Stable — 3+ Years"
         )
         st.markdown(f"""
         <div style="background:white;border-radius:10px;
@@ -806,7 +912,7 @@ if predict_button:
     rec_col1, rec_col2 = st.columns(2)
 
     with rec_col1:
-        if probability >= 0.6:
+        if probability >= high_threshold:
             st.markdown(f"""
             <div style="background:#FFF0F0;border-radius:10px;
                         padding:18px;border-left:5px solid #E24B4A">
@@ -814,15 +920,20 @@ if predict_button:
                             color:#E24B4A;margin-bottom:8px">
                     ❌ Recommendation: DECLINE or REFER
                 </div>
-                <div style="font-size:14px;color:#333;line-height:1.7">
-                    Default probability exceeds acceptable threshold.
+                <div style="font-size:14px;color:#333;
+                            line-height:1.7">
+                    Default probability exceeds your institution's
+                    threshold of {int(high_threshold*100)}%.
                     If referral is considered, require collateral,
-                    guarantor, or significant loan reduction before
-                    re-assessment.
+                    guarantor, or significant loan reduction
+                    before re-assessment.<br><br>
+                    <em style="color:#888">Credit committee review
+                    is recommended before communicating a final
+                    decline to the borrower.</em>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-        elif probability >= 0.3:
+        elif probability >= medium_threshold:
             st.markdown(f"""
             <div style="background:#FFFBF0;border-radius:10px;
                         padding:18px;border-left:5px solid #F0A500">
@@ -830,10 +941,20 @@ if predict_button:
                             color:#B8860B;margin-bottom:8px">
                     ⚡ Recommendation: CONDITIONAL APPROVAL
                 </div>
-                <div style="font-size:14px;color:#333;line-height:1.7">
-                    Proceed with caution. Consider reducing loan amount,
-                    shortening repayment term, or requesting additional
+                <div style="font-size:14px;color:#333;
+                            line-height:1.7">
+                    Score falls within your institution's review
+                    band ({int(medium_threshold*100)}–
+                    {int(high_threshold*100)}%).
+                    Consider reducing loan amount, shortening
+                    repayment term, or requesting additional
                     supporting documents before final approval.
+                    <br><br>
+                    <em style="color:#888">Loan officer judgement
+                    is critical at this threshold — local market
+                    knowledge, guarantor assessment, and business
+                    site visit should inform the final decision.
+                    </em>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -845,21 +966,28 @@ if predict_button:
                             color:#1D9E75;margin-bottom:8px">
                     ✅ Recommendation: APPROVE
                 </div>
-                <div style="font-size:14px;color:#333;line-height:1.7">
-                    Risk profile is within acceptable bounds.
+                <div style="font-size:14px;color:#333;
+                            line-height:1.7">
+                    Risk profile is within your institution's
+                    acceptable threshold of
+                    {int(medium_threshold*100)}%.
                     Proceed with standard loan processing and
-                    documentation verification.
+                    documentation verification.<br><br>
+                    <em style="color:#888">Loan officer should
+                    verify income source, confirm documentation,
+                    and apply institutional credit policy before
+                    final approval.</em>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
     with rec_col2:
         st.markdown(f"""
-        <div style="background:white;border-radius:10px;padding:18px;
-                    border:0.5px solid #D6E4F0;
+        <div style="background:white;border-radius:10px;
+                    padding:18px;border:0.5px solid #D6E4F0;
                     box-shadow:0 2px 6px rgba(0,0,0,0.05)">
-            <div style="font-size:15px;font-weight:700;color:#1F3864;
-                        margin-bottom:12px;
+            <div style="font-size:15px;font-weight:700;
+                        color:#1F3864;margin-bottom:12px;
                         border-bottom:2px solid #2E75B6;
                         padding-bottom:6px">
                 Summary for Credit File
@@ -938,13 +1066,23 @@ if predict_button:
                         {probability*100:.1f}% default probability
                     </td>
                 </tr>
-                <tr>
+                <tr style="border-bottom:1px solid #f0f0f0">
                     <td style="padding:6px 0;color:#888">
                         Risk Category
                     </td>
                     <td style="padding:6px 0;font-weight:700;
                                color:{risk_color};text-align:right">
                         {risk_label}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:6px 0;color:#888">
+                        Decision basis
+                    </td>
+                    <td style="padding:6px 0;font-weight:600;
+                               color:#1F3864;text-align:right;
+                               font-size:11px">
+                        Model score + officer judgement
                     </td>
                 </tr>
             </table>
@@ -965,6 +1103,8 @@ st.markdown("""
     target='_blank'>GitHub</a><br>
     Trained on 307,511 loan applications ·
     XGBoost · SHAP Explainability ·
-    Built for Nigerian Credit Risk Operations
+    Gender-Neutral · CBN Fair Lending Compliant ·
+    Full Nigerian Market Range · Adjustable Risk Thresholds ·
+    Decision Support Tool
 </div>
 """, unsafe_allow_html=True)
